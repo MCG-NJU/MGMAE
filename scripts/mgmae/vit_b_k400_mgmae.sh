@@ -4,13 +4,13 @@ set -x
 export MASTER_PORT=$((12000 + $RANDOM % 20000))
 export OMP_NUM_THREADS=1
 
-OUTPUT_DIR='YOUR_PATH/work_dir/vit_g_hybrid_pt_1200e'
-DATA_PATH='YOUR_PATH/data/hybrid_train.csv'
+OUTPUT_DIR='YOUR_PATH/work_dir/vit_b_k400_mgmae_800e'
+DATA_PATH='YOUR_PATH/data/k400/k400_train.csv'
 
 JOB_NAME=$1
 PARTITION=${PARTITION:-"video"}
 # 8 for 1 node, 16 for 2 node, etc.
-GPUS=${GPUS:-64}
+GPUS=${GPUS:-16}
 GPUS_PER_NODE=${GPUS_PER_NODE:-8}
 CPUS_PER_TASK=${CPUS_PER_TASK:-12}
 SRUN_ARGS=${SRUN_ARGS:-""}
@@ -26,27 +26,30 @@ srun -p $PARTITION \
         --kill-on-bad-exit=1 \
         --async \
         ${SRUN_ARGS} \
-        python -u run_mae_pretraining.py \
+        python -u run_mgmae_pretraining.py \
         --data_path ${DATA_PATH} \
-        --mask_type tube \
+        --mask_type mgmae \
         --mask_ratio 0.9 \
-        --decoder_mask_type run_cell \
-        --decoder_mask_ratio 0.5 \
-        --model pretrain_videomae_giant_patch14_224 \
+        --init_mask_map mix_gauss \
+        --model pretrain_videomae_base_patch16_224 \
+        --get_flow raft \
+        --flow_model '/your/path/model_zoo/raft-small-clean.pth' \
+        --flow_iter 6 \
+        --base_frame middle \
+        --warp_type backward \
+        --hole_filling consist \
         --decoder_depth 4 \
-        --batch_size 32 \
-        --with_checkpoint \
+        --batch_size 24 \
+        --num_sample 4 \
         --num_frames 16 \
         --sampling_rate 4 \
-        --num_sample 4 \
         --num_workers 10 \
+        --lr 1e-3 \
         --opt adamw \
-        --lr 6e-4 \
-        --clip_grad 0.02 \
         --opt_betas 0.9 0.95 \
-        --warmup_epochs 30 \
-        --save_ckpt_freq 5 \
-        --epochs 300 \
+        --warmup_epochs 20 \
+        --save_ckpt_freq 20 \
+        --epochs 200 \
         --log_dir ${OUTPUT_DIR} \
         --output_dir ${OUTPUT_DIR} \
         ${PY_ARGS}

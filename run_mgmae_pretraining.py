@@ -24,8 +24,9 @@ from timm.models import create_model
 # NOTE: Do not comment `import models`, it is used to register models
 import models  # noqa: F401
 import utils
-from dataset import build_pretraining_dataset
-from engine_for_pretraining import train_one_epoch
+from dataset import build_mgmae_dataset
+from engine_for_mgmae import train_one_epoch
+from flow_utils.raft.core.raft import RAFT
 from optim_factory import create_optimizer
 from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils import multiple_pretrain_samples_collate
@@ -45,6 +46,25 @@ def get_args():
         type=str,
         metavar='MODEL',
         help='Name of model to train')
+    parser.add_argument(
+        '--get_flow', default='raft', choices=['raft'], type=str)
+    parser.add_argument(
+        '--base_frame',
+        default='middle',
+        choices=['first', 'middle', 'random'],
+        type=str)
+    parser.add_argument(
+        '--flow_model',
+        default='/your/path/model_zoo/raft-small-clean.pth',
+        type=str,
+        help='load ckpt of flow model')
+    parser.add_argument(
+        '--flow_iter', default=6, type=int, help='iter of the flow model')
+    parser.add_argument(
+        '--warp_type',
+        default='backward',
+        choices=['forward', 'backward'],
+        type=str)
     parser.add_argument('--tubelet_size', type=int, default=2)
     parser.add_argument(
         '--with_checkpoint', action='store_true', default=False)
@@ -54,10 +74,16 @@ def get_args():
 
     parser.add_argument(
         '--mask_type',
-        default='tube',
-        choices=['random', 'tube'],
+        default='mgmae',
+        choices=['mgmae'],
         type=str,
         help='encoder masked strategy')
+    parser.add_argument(
+        '--init_mask_map',
+        default='mix_gauss',
+        choices=['mix_gauss', 'pixel_rand', 'token_rand'],
+        type=str,
+        help='generating strategy for the initial mask map')
     parser.add_argument(
         '--decoder_mask_type',
         default='none',
@@ -72,6 +98,16 @@ def get_args():
         default=0.0,
         type=float,
         help='mask ratio of decoder')
+
+    parser.add_argument('--topk_on_all', action='store_true', default=False)
+    parser.add_argument(
+        '--hole_filling',
+        default='consist',
+        choices=['none', 'consist', 'prev'],
+        type=str)
+
+    parser.add_argument(
+        '--exposure_chance', action='store_true', default=False)
 
     parser.add_argument(
         '--input_size',
@@ -294,7 +330,7 @@ def main(args):
     args.patch_size = patch_size
 
     # get dataset
-    dataset_train = build_pretraining_dataset(args)
+    dataset_train = build_mgmae_dataset(args)
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
@@ -352,6 +388,21 @@ def main(args):
     print("Model = %s" % str(model_without_ddp))
     print('number of params: {} M'.format(n_parameters / 1e6))
 
+    # get flow model
+    if args.get_flow == 'raft':
+        flow_args = argparse.Namespace(
+            model=args.flow_model,
+            small=('small' in args.flow_model),
+            mixed_precision=True,
+            alternate_corr=False)
+
+        flow_model = RAFT(flow_args)
+        flow_model.load_state_dict(torch.load(flow_args.model))
+        flow_model.to(device)
+        flow_model.eval()
+    else:
+        raise NotImplementedError
+
     # scale the lr
     args.lr = args.lr * total_batch_size / 256
     args.min_lr = args.min_lr * total_batch_size / 256
@@ -405,11 +456,13 @@ def main(args):
             log_writer.set_step(epoch * num_training_steps_per_epoch)
         train_stats = train_one_epoch(
             model,
+            flow_model,
             data_loader_train,
             optimizer,
             device,
             epoch,
             loss_scaler,
+            args,
             args.clip_grad,
             log_writer=log_writer,
             start_steps=epoch * num_training_steps_per_epoch,
@@ -429,8 +482,10 @@ def main(args):
                     epoch=epoch)
 
         log_stats = {
-            **{f'train_{k}': v
-               for k, v in train_stats.items()}, 'epoch': epoch,
+            **{
+                f'train_{k}': v
+                for k, v in train_stats.items()
+            }, 'epoch': epoch,
             'n_parameters': n_parameters
         }
 

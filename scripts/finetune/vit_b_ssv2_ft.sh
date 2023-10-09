@@ -4,9 +4,9 @@ set -x
 export MASTER_PORT=$((12000 + $RANDOM % 20000))
 export OMP_NUM_THREADS=1
 
-OUTPUT_DIR='YOUR_PATH/work_dir/vit_b_hybrid_pt_800e_ssv2_ft'
+OUTPUT_DIR='YOUR_PATH/work_dir/vit_b_ssv2_mgmae_800e_ssv2_ft'
 DATA_PATH='YOUR_PATH/data/sthv2'
-MODEL_PATH='YOUR_PATH/model_zoo/vit_b_hybrid_pt_800e.pth'
+MODEL_PATH='YOUR_PATH/model_zoo/vit_b_ssv2_mgmae_800e.pth'
 
 JOB_NAME=$1
 PARTITION=${PARTITION:-"video"}

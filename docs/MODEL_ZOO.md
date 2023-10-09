@@ -1,41 +1,23 @@
-# VideoMAEv2 Model Zoo
-
-## Model Weight Links
-Please fill out [VideoMAE V2 Download Request Form](https://docs.google.com/forms/d/e/1FAIpQLSd1SjKMtD8piL9uxGEUwicerxd46bs12QojQt92rzalnoI3JA/viewform?usp=sf_link), **you will see the download link** for the VideoMAE V2 model weights after submission. The form asks for some information about your organization and how you plan to use the model, so that we can better understand the needs of our users and improve our future works. 
-
-The weights of the distilled models can be downloaded directly at [Distillation](#Distillation) section.
+# MGMAE Model Zoo
 
 ## Pre-train
 
-| Model | Config | Dataset | Encoder Masking | Decoder Masking | Epoch | \#Frame |
-| :---: | :----  | :-----: | :-------------: | :-------------: | :---: | :-----: |
-| ViT-giant | [vit_g_hybrid_pt_1200e]((/scripts/pretrain/vit_g_hybrid_pt.sh)) | UnlabeledHybrid | tube (90%) | running cell (50%) | 1200 | 16 |
-
-- We set **different sampling intervals** for the videos from different sources in unlabeledhybrid: 2 for SSv2 and 4 for the other datasets.
-
+| Model | Config | Dataset | Encoder Masking | Decoder Masking | Epoch | \#Frame | Ckpt | Log |
+| :---: | :----  | :-----: | :-------------: | :-------------: | :---: | :-----: | :--: | :-: |
+| ViT-base | [vit_b_k400_mgmae_800e]((/scripts/mgmae/vit_b_k400_mgmae.sh)) | K400 | MG masking (90%) | None | 800 | 16 | [vit_b_k400_mgmae_800e.pth](https://drive.google.com/file/d/10prrPjobDY4ayKpXhiMX8HHpxYqbLNCq/view?usp=sharing) | [vit_b_k400_mgmae_800e_log.txt](https://drive.google.com/file/d/1TqPs1XcApT6Qi9YECxtHx5Qm0JM-_vOS/view?usp=sharing) |
+| ViT-base | [vit_b_k400_mgmae_1600e]((/scripts/mgmae/vit_b_k400_mgmae.sh)) | K400 | MG masking (90%) | None | 1600 | 16 | [vit_b_k400_mgmae_1600e.pth](https://drive.google.com/file/d/1EfcsX_vIYWLvm26mUXxJH8CZTbmr0ad9/view?usp=sharing) | [vit_b_k400_mgmae_1600e_log.txt](https://drive.google.com/file/d/1E5Ud4SX5C2xwL_9uPAmZysxYAJItojuk/view?usp=sharing) |
+| ViT-base | [vit_b_ssv2_mgmae_800e]((/scripts/mgmae/vit_b_ssv2_mgmae.sh)) | SSV2 | MG masking (90%) | None | 800 | 16 | [vit_b_ssv2_mgmae_800e.pth](https://drive.google.com/file/d/14cEywYN0lMm5_he6bLlY1Zdsahw33dtG/view?usp=sharing) | [vit_b_ssv2_mgmae_800e_log.txt](https://drive.google.com/file/d/10HRqfQvUcwBINTvB1gZ9Ar5pomxocwXN/view?usp=sharing) |
+| ViT-base | [vit_b_ssv2_mgmae_2400e]((/scripts/mgmae/vit_b_ssv2_mgmae.sh)) | SSV2 | MG masking (90%) | None | 2400 | 16 | [vit_b_ssv2_mgmae_2400e.pth](https://drive.google.com/file/d/1YR5N0LeqAO-fxYM1xb7kvM_x37yiTqKS/view?usp=sharing) | [vit_b_ssv2_mgmae_2400e_log.txt](https://drive.google.com/file/d/1ekK-cQyaMO3ZjfRO2C3YmQLl3erjiOXv/view?usp=sharing) |
 
 ## Fine-tune
-| Model | Config | Dataset | Pre-train | Post-pre-train | \#Frame | Top-1 | Top-5 |
-| :---: | :----  | :-----: | :-------: | :------------: | :-----: | :---: | :---: |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k710_ft](/scripts/finetune/vit_g_k710_ft.sh) | K710 | UnlabeledHybrid | None | 16x5x3 | 83.8 | 96.4 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k400_ft](/scripts/finetune/vit_g_k400_ft.sh) | K400 | UnlabeledHybrid | None | 16x5x3 | 87.2 | 97.4 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k710_it_k400_ft](/scripts/finetune/vit_g_k710_it_k400_ft.sh) | K400 | UnlabeledHybrid | K710 | 16x5x3 | 88.4 | 98.0 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k710_it_k600_ft](/scripts/finetune/vit_g_k710_it_k600_ft.sh) | K600 | UnlabeledHybrid | K710 | 16x5x3 | 88.8 | 98.2 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_ssv2_ft](/scripts/finetune/vit_g_ssv2_ft.sh) | SSv2 | UnlabeledHybrid | None | 16x2x3 | 77.0 | 95.9 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k710_it_ucf101_ft](/scripts/finetune/vit_g_k710_it_ucf101_ft.sh) | UCF101 | UnlabeledHybrid | K710 | 16x5x3 | 99.6 | 100.0 |
-| ViT-giant | [vit_g_hybrid_pt_1200e_k710_it_hmdb51_ft](/scripts/finetune/vit_g_k710_it_hmdb51_ft.sh) | HMDB51 | UnlabeledHybrid | K710 | 16x5x3 | 88.1 | 98.5 |
 
-- We report the fine-tuning accuracy for **sparse sampling** on SSv2 and for **dense sampling** on the other datasets.
+| Model | Config | Dataset | Pre-train | Post-pre-train | \#Frame | Top-1 | Top-5 | Ckpt | Log |
+| :---: | :----  | :-----: | :-------: | :------------: | :-----: | :---: | :---: | :--: | :-: |
+| ViT-base | [vit_b_k400_mgmae_800e_k400_ft](/scripts/finetune/vit_b_k400_ft.sh) | K400 | K400 | None | 16x5x3 | 81.2 | 94.9 | [vit_b_k400_mgmae_800e_k400_ft.pth](https://drive.google.com/file/d/1_Z_085fN6ZM0lw6vn1vbebvyTTmVui0H/view?usp=sharing) | [vit_b_k400_mgmae_800e_k400_ft.pth](https://drive.google.com/file/d/1teswuUOvGgTMoDWp0cgOvH0ZTIuKGQTY/view?usp=sharing) |
+| ViT-base | [vit_b_k400_mgmae_1600e_k400_ft](/scripts/finetune/vit_b_k400_ft.sh) | K400 | K400 | None | 16x5x3 | 81.8 | 95.0 | [vit_b_k400_mgmae_1600e_k400_ft.pth](https://drive.google.com/file/d/1VnbM9suJiRpR6d2djpYQeiinYKHUmDKz/view?usp=sharing) | [vit_b_k400_mgmae_1600e_k400_ft.pth](https://drive.google.com/file/d/1jAHz1v4Z3hW5RaAppU9e9LFbE4_1Jac9/view?usp=sharing) |
+| ViT-base | [vit_b_ssv2_mgmae_800e_ssv2_ft](/scripts/finetune/vit_b_ssv2_ft.sh) | SSV2 | SSV2 | None | 16x2x3 | 71.0 | 93.1 | [vit_b_ssv2_mgmae_800e_ssv2_ft.pth](https://drive.google.com/file/d/1BGIQGlFPOITBF_0GB8ieoNZZiF7pPSsX/view?usp=sharing) | [vit_b_ssv2_mgmae_800e_ssv2_ft.pth](https://drive.google.com/file/d/1r6uaDnxHBGZmKZFQdfH4c45lphtFsZEA/view?usp=sharing) |
+| ViT-base | [vit_b_ssv2_mgmae_2400e_ssv2_ft](/scripts/finetune/vit_b_ssv2_ft.sh) | SSV2 | SSV2 | None | 16x2x3 | 72.3 | 93.5 | [vit_b_ssv2_mgmae_2400e_ssv2_ft.pth](https://drive.google.com/file/d/1TnHDyqPVw84fVzVrpvTiDWT_HU3kNRCo/view?usp=sharing) | [vit_b_ssv2_mgmae_2400e_ssv2_ft.pth](https://drive.google.com/file/d/1L-qGFC7TG_sBtkIZkX3csz-0MulM53Xa/view?usp=sharing)  |
+
+- We report the fine-tuning accuracy for **sparse sampling** on SSv2 and for **dense sampling** on K400.
 - \#Frame = #input_frame x #clip x #crop.
 - all the input resolution is $224^2$.
-
-## Distillation
-|  Model  | Dataset | Teacher Model | \#Frame | K710 Top-1 | K400 Top-1 | K600 Top-1 | Checkpoint |
-| :-----: | :-----: | :-----------: | :-----: | :--------: | :--------: | :--------: | :--------  |
-| ViT-small | K710 | vit_g_hybrid_pt_1200e_k710_ft | 16x5x3 | 77.6 | 83.7 | 83.1 | [vit_s_k710_dl_from_giant.pth](https://pjlab-gvm-data.oss-cn-shanghai.aliyuncs.com/internvideo/distill/vit_s_k710_dl_from_giant.pth) |
-| | | fine-tuning accuracy | 16x7x3 | -- | 84.0 | 84.6 | -- | |
-| ViT-base | K710 | vit_g_hybrid_pt_1200e_k710_ft | 16x5x3 | 81.5 | 86.6 | 85.9 | [vit_b_k710_dl_from_giant.pth](https://pjlab-gvm-data.oss-cn-shanghai.aliyuncs.com/internvideo/distill/vit_b_k710_dl_from_giant.pth) |
-| | | fine-tuning accuracy | 16x7x3 | -- | 87.1 | 87.4 |  |
-
-- We initialize the parameters of the student model with the model obtained after the post-pre-train stage.
-- The fine-tuning accuracy refers to the accuracy achieved by further fine-tuning several epochs in the specified dataset after distillation.

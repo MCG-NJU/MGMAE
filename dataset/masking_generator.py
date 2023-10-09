@@ -5,7 +5,11 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
+from functools import partial
+
 import numpy as np
+import torch
+from einops import rearrange
 
 
 class Cell():
@@ -111,3 +115,117 @@ class RunningCellMaskingGenerator:
     def __call__(self):
         mask = self.all_mask_maps[np.random.randint(self.cell_size)]
         return np.copy(mask)
+
+
+def gaussian_2d(mean_x, mean_y, x, y, std_x, std_y):
+    # A = 0.5 / (math.pi * std_x * std_y) # standard gaussian distribution
+    A = 1  # the maximum value
+    B = ((x - mean_x) / std_x)**2 + ((y - mean_y) / std_y)**2
+    return A * torch.exp(-B)
+
+
+class MixGaussianInitialMaskingGenerator:
+
+    def __init__(self, input_size, mask_ratio, patch_size, method='max'):
+        assert method in ['max', 'sum']
+
+        _, self.height, self.width = input_size
+        assert self.height == self.width
+        self.patch_size = patch_size
+        self.method = method
+        self.img_h = self.height * patch_size
+        self.img_w = self.width * patch_size
+
+        self.num_patches = self.height * self.width  # 14x14
+        self.num_mask = int(mask_ratio * self.num_patches)
+        self.num_vis = self.num_patches - self.num_mask
+
+        _x = torch.linspace(0, self.img_h - 1, self.img_h)
+        _y = torch.linspace(0, self.img_w - 1, self.img_w)
+        _x, _y = torch.meshgrid(_x, _y)
+        self.gauss = partial(
+            gaussian_2d, x=_x, y=_y, std_x=patch_size, std_y=patch_size)
+
+    def __repr__(self):
+        repr_str = "Mask: total patches {}, mask patches {}".format(
+            self.num_patches, self.num_mask)
+        return repr_str
+
+    def __call__(self):
+        all_pos = torch.cartesian_prod(
+            torch.arange(self.height), torch.arange(self.width))
+        rand_pos = all_pos[torch.randperm(all_pos.size(0))[:self.num_vis]]
+        rand_pos = rand_pos * self.patch_size + (self.patch_size - 1.) / 2
+
+        mask = torch.zeros(self.img_h, self.img_w)
+        for m_x, m_y in rand_pos:
+            if self.method == 'max':
+                mask = torch.maximum(mask, self.gauss(m_x, m_y))
+            elif self.method == 'sum':
+                mask = mask + self.gauss(m_x, m_y)
+        mask /= mask.max()
+        return mask
+
+
+class PixelRandomInitialMaskingGenerator:
+
+    def __init__(self, input_size, mask_ratio, patch_size, eps=1e-8):
+        _, self.height, self.width = input_size
+        self.patch_size = patch_size
+        self.eps = eps  # used to locate warp empty
+
+        self.num_patches = self.height * self.width  # 14x14
+        self.num_mask = int(mask_ratio * self.num_patches)
+
+        self.img_h = self.height * patch_size
+        self.img_w = self.width * patch_size
+        self.num_pixel = self.img_h * self.img_w
+        self.vis_pixel = int(self.num_pixel * (1 - mask_ratio))
+
+    def __repr__(self):
+        repr_str = "Mask: total patches {}, mask patches {}".format(
+            self.num_patches, self.num_mask)
+        return repr_str
+
+    def __call__(self):
+        rand = torch.randn(self.num_pixel)
+        mask_idx = torch.topk(rand, self.vis_pixel, sorted=False).indices
+        mask = torch.zeros_like(rand).scatter(-1, mask_idx, 1)
+        mask = mask.view(self.img_h, self.img_w).to(torch.float32)
+        mask[mask == 0] = self.eps
+        return mask
+
+
+class TokenRandomInitialMaskingGenerator:
+
+    def __init__(self, input_size, mask_ratio, patch_size, eps=1e-8):
+        _, self.height, self.width = input_size
+        self.patch_size = patch_size
+        self.eps = eps  # used to locate warp empty
+
+        self.num_patches = self.height * self.width  # 14x14
+        self.num_mask = int(mask_ratio * self.num_patches)
+        self.num_vis = self.num_patches - self.num_mask
+
+    def __repr__(self):
+        repr_str = "Mask: total patches {}, mask patches {}".format(
+            self.num_patches, self.num_mask)
+        return repr_str
+
+    def __call__(self):
+        mask = np.hstack([
+            np.zeros(self.num_mask),
+            np.ones(self.num_vis),
+        ])
+        np.random.shuffle(mask)
+        mask = torch.as_tensor(mask).unsqueeze(-1).repeat(
+            1, self.patch_size * self.patch_size)
+        mask = rearrange(
+            mask,
+            '(h w) (p0 p1) -> (h p0) (w p1)',
+            h=self.height,
+            w=self.width,
+            p0=self.patch_size,
+            p1=self.patch_size).to(torch.float32)
+        mask[mask == 0] = self.eps
+        return mask

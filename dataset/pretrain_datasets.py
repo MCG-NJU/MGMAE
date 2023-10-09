@@ -8,7 +8,10 @@ from torchvision import transforms
 
 from .loader import get_image_loader, get_video_loader
 from .masking_generator import (
+    MixGaussianInitialMaskingGenerator,
+    PixelRandomInitialMaskingGenerator,
     RunningCellMaskingGenerator,
+    TokenRandomInitialMaskingGenerator,
     TubeMaskingGenerator,
 )
 from .transforms import (
@@ -17,6 +20,65 @@ from .transforms import (
     Stack,
     ToTorchFormatTensor,
 )
+
+
+class DataAugmentationForMGMAE(object):
+
+    def __init__(self, args):
+        self.input_mean = [0.485, 0.456, 0.406]
+        self.input_std = [0.229, 0.224, 0.225]
+        div = True
+        roll = False
+        normalize = GroupNormalize(self.input_mean, self.input_std)
+        self.train_augmentation = GroupMultiScaleCrop(args.input_size,
+                                                      [1, .875, .75, .66])
+        self.transform = transforms.Compose([
+            self.train_augmentation,
+            Stack(roll=roll),
+            ToTorchFormatTensor(div=div),
+            normalize,
+        ])
+        if args.init_mask_map == 'mix_gauss':
+            self.init_mask_map_generator = MixGaussianInitialMaskingGenerator(
+                args.window_size, args.mask_ratio, args.patch_size[0])
+        elif args.init_mask_map == 'pixel_rand':
+            self.init_mask_map_generator = PixelRandomInitialMaskingGenerator(
+                args.window_size, args.mask_ratio, args.patch_size[0])
+        elif args.init_mask_map == 'token_rand':
+            self.init_mask_map_generator = TokenRandomInitialMaskingGenerator(
+                args.window_size, args.mask_ratio, args.patch_size[0])
+        else:
+            raise NotImplementedError(
+                'Unsupported encoder masking strategy type.')
+        if args.decoder_mask_ratio > 0.:
+            if args.decoder_mask_type == 'run_cell':
+                self.decoder_mask_map_generator = RunningCellMaskingGenerator(
+                    args.window_size, args.decoder_mask_ratio)
+            else:
+                raise NotImplementedError(
+                    'Unsupported decoder masking strategy type.')
+
+    def __call__(self, images):
+        process_data, _ = self.transform(images)
+        init_mask_map = self.init_mask_map_generator()
+        if hasattr(self, 'decoder_mask_map_generator'):
+            decoder_mask_map = self.decoder_mask_map_generator()
+        else:
+            decoder_mask_map = 1 - init_mask_map
+        return process_data, init_mask_map, decoder_mask_map
+
+    def __repr__(self):
+        repr = "(DataAugmentationForMGMAE,\n"
+        repr += "  transform = %s,\n" % str(self.transform)
+        repr += "  Initial Masking Map Generator = %s,\n" % str(
+            self.init_mask_map_generator)
+        if hasattr(self, 'decoder_mask_map_generator'):
+            repr += "  Decoder Masking Generator = %s,\n" % str(
+                self.decoder_mask_map_generator)
+        else:
+            repr += "  Do not use decoder masking,\n"
+        repr += ")"
+        return repr
 
 
 class DataAugmentationForVideoMAEv2(object):
